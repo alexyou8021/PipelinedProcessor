@@ -16,10 +16,10 @@ module main();
     clock clock0(halt,clk);
 
 	always @(posedge clk) begin
-		//$display (pcWB);
-		//$display ("%d:%d",opWB,nopWB);
-		//$display (regReadAddr1);
-		//$display (regReadData1);
+		//$display (pcE);
+		//$display ("%d:%d",opE,nopE);
+		//$display ("%d:%d:%d",regReadEn0, regReadAddr0, regReadData0);
+		//$display ("%d:%d:%d",regReadEn1, regReadAddr1, regReadData1);
 		//$display ("%h",rsvWB);
 		//$display (branchTarget);
 		//$display ("%d : %h", targetWriteAddr0WB, targetVal1);
@@ -127,7 +127,7 @@ module main();
 				crWB[0] <= targetVal1[0]==1;
 				crWB[1] <= targetVal1[0]==0 && targetVal1!=0;
 				crWB[2] <= targetVal1==0;
-				crWB[3] <= (isOE) ? (nextXER|xer) : xer;
+				crWB[3] <= (isOE) ? (ov|xer[32]) : xer[32];
 			end
 			if(isMTCRFWB&&instrWB[11]==0) begin
 				if(fxm[0]==1) begin
@@ -144,8 +144,10 @@ module main();
 				end
 				//crWB <= (rsvWB[32:63]&mask)|(crWB&~mask);
 			end
-			if(isOE&&(isAddWB|isOrWB))
-					xer <= nextXER|xer;
+			if(isOE&&(isAddWB|isOrWB)) begin
+					xer[32] <= ov|xer;
+					xer[33] <= ov;
+			end
 		end
 	end	
 //							PC
@@ -457,9 +459,9 @@ module main();
 	wire cond_okWB = boWB[0] | (crWB[biWB]==boWB[1]);
 	wire [0:8] reg3charWB = reg3WB [56:63];
 
-	wire [0:63] nextXER = isMTSPRWB&&(sprWB==1) ? rsvWB :
-			(((ravWB[0]==1)&&(rbvWB[0]==1)&&targetVal1[0]==0)|
-			((ravWB[0]==0)&&(rbvWB[0]==0)&&targetVal1[0]==1))
+	wire [0:63] nextXER = isMTSPRWB&&(sprWB==1) ? rsvWB : nextXER; 
+	wire ov = ((ravWB[0]==1)&&(rbvWB[0]==1)&&targetVal1[0]==0)|
+			((ravWB[0]==0)&&(rbvWB[0]==0)&&targetVal1[0]==1)
 			? 1 : 0;
 	wire [0:63] nextCTR = isMTSPRWB&&(sprWB==9) ? rsvWB : ctr;
 	wire [0:63] nextLR = isMTSPRWB&&(sprWB==8) ? rsvWB : lr;
