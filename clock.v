@@ -23,7 +23,7 @@ module clock(
             $display("=== %d",cycles);
             $finish;
         end
-        if (cycles == 10000) begin
+        if (cycles == 850) begin
             $display("ran for 10000 cycles");
             $finish;
         end
