@@ -18,18 +18,46 @@ module main();
 	always @(posedge clk) begin
 		//$display (pcWB);
 		//$display ("%d:%d",opWB,nopWB);
-		//$display ("%h:%h,%h",Ago1memWriteAddr,memWriteAddr, pcD[0:60]);
-		//$display ("%d:%d", reg0WB, reg3WB);
+		//$display (regReadAddr1);
+		//$display (regReadData1);
+		//$display ("%h",rsvWB);
 		//$display (branchTarget);
 		//$display ("%d : %h", targetWriteAddr0WB, targetVal1);
-		//$display ("%h:%h:%h",memWriteEn,memWriteAddr,memWriteData);
-		//$display ("%h:%h:%h",Ago1memWriteEn, Ago1memWriteAddr,Ago1memWriteData);
 		if(isBranchingWB&&!nopWB) begin
 			pc <= branchTarget;
 			//nopF <= 1;
 			nopD <= 1;
 			nopE <= 1;
 			nopWB <= 1;
+		end else if(isSTDWB) begin
+			if(memWriteEn&&memWriteAddr==pcWB[0:60]) begin
+				pc <= pcE;
+				nopD <= 1;
+				nopE <= 1;
+				nopWB <= 1;
+			end
+			else if(memWriteAddr==pcD[0:60]) begin
+				pc <= pcE;
+				nopD <= 1;
+				nopE <= 1;
+				nopWB <= 1;
+			end
+			else if(memWriteAddr==pc[0:60]) begin
+				pc <= pcE;
+				nopD <= 1;
+				nopE <= 1;
+				nopWB <= 1;
+			end
+			else begin 
+				pc <= nextPC;
+				pcD <= pc;
+				pcE <= pcD;
+				pcWB <= pcE;
+				nopF <= 0;//isOtherWB;
+				nopD <= nopF;
+				nopE <= nopD;
+				nopWB <= nopE;
+			end
 		end else begin
 			pc <= nextPC;
 			pcD <= pc;
@@ -70,13 +98,19 @@ module main();
 					end
 				end	
 				if(isLK) begin
-					lr <= {pcWB[0:61],2'b00};
+					lr <= {pcWB[0:61],2'b00}+4 ;
 				end
 			end
 			if(isMTSPRWB) begin
-				lr <= nextLR;
-				xer <= nextXER;
-				ctr <= nextCTR;
+				if(sprWB==8) begin 
+					lr <= nextLR;
+				end
+				if(sprWB==1) begin 
+					xer <= nextXER;
+				end
+				if(sprWB==9) begin 
+					ctr <= nextCTR;
+				end
 			end
 			if(isSCWB&&(instrWB[30]==1)&&(lev==0|lev==1)) begin
 				if(reg0WB==0) begin
@@ -95,6 +129,21 @@ module main();
 				crWB[2] <= targetVal1==0;
 				crWB[3] <= (isOE) ? (nextXER|xer) : xer;
 			end
+			if(isMTCRFWB&&instrWB[11]==0) begin
+				if(fxm[0]==1) begin
+					crWB[0] <= rsvWB[32];
+				end
+				if(fxm[0]==1) begin
+					crWB[1] <= rsvWB[33];
+				end
+				if(fxm[0]==1) begin
+					crWB[2] <= rsvWB[34];
+				end
+				if(fxm[0]==1) begin
+					crWB[3] <= rsvWB[35];
+				end
+				//crWB <= (rsvWB[32:63]&mask)|(crWB&~mask);
+			end
 			if(isOE&&(isAddWB|isOrWB))
 					xer <= nextXER|xer;
 		end
@@ -110,7 +159,7 @@ module main();
 	reg [31:0] crWB = 0;
 	reg [0:63] ctr = 0;
 	reg [0:63] lr = 0;
-	reg xer = 0;
+	reg [0:63] xer = 0;
 //						NOP
 	reg nopF = 0;
 	reg nopD = 0;
@@ -184,10 +233,6 @@ module main();
 	reg [0:60] Ago1memReadAddr0;
 	reg [0:60] Ago2memReadAddr1;
 //						DECODE
-	wire [0:63] mem0Forward = //(Ago1memWriteEn&&(Ago1memWriteAddr==pcD[0:60])) ? Ago1memWriteData :
-					(memWriteEn&&(memWriteAddr==pcD[0:60])) ? memWriteData :
-					memReadData0 [0:63];
-	//wire [0:31] instr =  pcD[61] ? mem0Forward[32:63] : mem0Forward[0:31];
 	wire [0:31] instr =  pcD[61] ? memReadData0[32:63] : memReadData0[0:31];
 	wire [0:5] op = instr [0:5];
 	wire [0:8] xop9 = instr [22:30];
@@ -286,8 +331,11 @@ module main();
 	wire [0:63] bdWB = { { {48{instrWB [16]}}, instrWB [16:29]}, 2'b00};
 	wire bhWB = instrWB[19];
 	wire [0:63] dsWB = { {48{instrWB [16]}} , instrWB [16:29], 2'b00};
-	wire [0:10] sprWB = instrWB [11:20];
+	wire [0:5] sprWB = instrWB [11:15] | instrWB [16:20];
 	wire [0:7] lev = instrWB [20:26];
+	wire [0:7] fxm = instrWB [12:19];
+	//wire [0:3] mask = {4{fxm[0]}}|{4{fxm[1]}}|{4{fxm[2]}}|{4{fxm[3]}}|{4{fxm[4]}}|{4{fxm[5]}}|{4{fxm[6]}}|{4{fxm[7]}};
+	
 
 	wire isAddWB = (opWB == 31) & (xop9WB == 266);
 	wire isOrWB = (opWB == 31) & (xop10WB == 444);
@@ -309,13 +357,14 @@ module main();
 				isLDWB|isLDUWB|isSCWB|isSTDWB|isSTDUWB|isMTSPRWB|
 					isMFSPRWB|isMTCRFWB);
 	
-    	assign regWriteEn0 = (isAddWB|isOrWB|isAddiWB|isLDWB|isLDUWB)&&!nopWB;
+    	assign regWriteEn0 = (isAddWB|isOrWB|isAddiWB|isLDWB|isLDUWB|isMFSPRWB)&&!nopWB;
 	assign regWriteEn1 = (isLDUWB|isSTDUWB)&&!nopWB;
 	assign memWriteEn = (isSTDWB|isSTDUWB)&&!nopWB;
     	wire [0:4] targetWriteAddr0WB = isAddWB ? rtWB : 
 					isOrWB ? raWB :
 					isAddiWB ? rtWB : 
-					(isLDWB|isLDUWB) ? rtWB : 0;
+					(isLDWB|isLDUWB) ? rtWB :
+					isMFSPRWB ? rtWB : 0;
 	wire [0:4] targetWriteAddr1WB = raWB;
 	wire [0:63] eaWB = (raWB==0) ? dsWB : ravWB + dsWB;
 	wire [0:63] ra0WB = (raWB==0) ? siWB : ravWB + siWB;
@@ -325,19 +374,20 @@ module main();
 					isOrWB ? rsvWB | rbvWB :
 					isAddiWB ? ra0WB : 
 					(isLDWB|isLDUWB) ? eav : 
-					(isMFSPR&&sprWB==1) ? xer : 
-					(isMFSPR&&sprWB==8) ? lr :
-					(isMFSPR&&sprWB==9) ? ctr : 0;
+					(isMFSPRWB&&sprWB==1) ? xer : 
+					(isMFSPRWB&&sprWB==8) ? lr :
+					(isMFSPRWB&&sprWB==9) ? ctr : 0;
 	wire [0:63] targetVal2 =  isLDUWB|isSTDUWB ? eaWB : 0;
 
-    	assign regReadEn0 = (isAdd|isOr|isAddi|isLD|isLDU|isSC|isSTD|isSTDU|isMTSPR);
+    	assign regReadEn0 = (isAdd|isOr|isAddi|isLD|isLDU|isSC|isSTD|isSTDU|isMTSPR|isMTCRF);
     	assign regReadAddr0 = 	isAdd ? ra :
 				isOr ? rs :
 				isAddi ? ra :
 				(isLD|isLDU) ? ra : 
 				isSC ? 0 :
 				(isSTD|isSTDU) ? ra :
-				isMTSPR ? rs : 0;
+				isMTSPR ? rs :
+				isMTCRF ? rs : 0;
 	
 	assign regReadEn1 = (isAdd|isOr|isSC|isSTD|isSTDU);
 	assign regReadAddr1 = 	isAdd ? rb : 
@@ -357,12 +407,12 @@ module main();
 					(Ago1WriteEn0&&Ago1WriteAddr0==rbE) ? Ago1WriteData0 :
 					(Ago1WriteEn1&&Ago1WriteAddr1==rbE) ? Ago1WriteData1 :
 					regReadData1 : 0;
-	wire [0:63] rsv = 	(isOrE|isSTDE|isSTDUE|isMTSPRE) ?
+	wire [0:63] rsv = 	(isOrE|isSTDE|isSTDUE|isMTSPRE|isMTCRFE) ?
 					(regWriteEn0&&targetWriteAddr0WB==rsE) ? targetVal1 :
 					(regWriteEn1&&targetWriteAddr1WB==rsE) ? targetVal2 :
 					(Ago1WriteEn0&&Ago1WriteAddr0==rsE) ? Ago1WriteData0 :
 					(Ago1WriteEn1&&Ago1WriteAddr1==rsE) ? Ago1WriteData1 :
-					(isOrE|isMTSPRE) ? regReadData0 :
+					(isOrE|isMTSPRE|isMTCRFE) ? regReadData0 :
 					regReadData1 : 0; //isSTD|isSTDU
 	wire [0:63] ea = (raE==0) ? dsE : rav + dsE;
 	wire [0:63] ra0 = (raE==0) ? siE : rav + siE;
@@ -401,18 +451,18 @@ module main();
 	wire isOE = (oeWB==1);
 	wire [0:63] branchTarget = isBWB ? 	isAA ? liWB : liWB+pcWB : 
 						isBCWB ? (isAA ? bdWB : bdWB+pcWB) :
-						isBCLRWB ? lr+4 :
-						 pcWB+4;
+						isBCLRWB ? lr :
+						0;
 	wire ctr_okWB = boWB[2] | ((ctr!=1)^boWB[3]);
 	wire cond_okWB = boWB[0] | (crWB[biWB]==boWB[1]);
 	wire [0:8] reg3charWB = reg3WB [56:63];
 
-	wire nextXER = isMTSPRWB&&(sprWB==1) ? rsvWB :
+	wire [0:63] nextXER = isMTSPRWB&&(sprWB==1) ? rsvWB :
 			(((ravWB[0]==1)&&(rbvWB[0]==1)&&targetVal1[0]==0)|
 			((ravWB[0]==0)&&(rbvWB[0]==0)&&targetVal1[0]==1))
 			? 1 : 0;
-	wire nextCTR = isMTSPRWB&&(sprWB==9) ? rsvWB : ctr;
-	wire nextLR = isMTSPRWB&&(sprWB==8) ? rsvWB : lr;
+	wire [0:63] nextCTR = isMTSPRWB&&(sprWB==9) ? rsvWB : ctr;
+	wire [0:63] nextLR = isMTSPRWB&&(sprWB==8) ? rsvWB : lr;
 
     	assign regWriteAddr0 = 	isAddWB ? rtWB : 
 				isOrWB ? raWB :
