@@ -16,8 +16,8 @@ module main();
     clock clock0(halt,clk);
 
 	always @(posedge clk) begin
-		$display (pcWB);
-		$display ("%d:%d",opWB,nopWB);
+		//$display (pcWB);
+		//$display ("%d:%d",opWB,nopWB);
 		//$display (regReadAddr1);
 		//$display (regReadData1);
 		//$display ("%h",rsvWB);
