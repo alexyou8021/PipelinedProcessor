@@ -23,7 +23,6 @@ module main();
 		//$display ("%d : %h", targetWriteAddr0WB, targetVal1);
 		if(isBranchingWB&&!nopWB) begin
 			pc <= branchTarget;
-			//nopF <= 1;
 			nopD <= 1;
 			nopE <= 1;
 			nopWB <= 1;
@@ -252,12 +251,11 @@ module main();
 	wire isLDU = (op == 58) & (xop2 == 1) & (ra!=0) & (ra!=rt);
 	wire isSC = (op == 17);
 	wire isSTD = (op == 62) & (xop2 == 0);
-	wire isSTDU = (op == 62) & (xop2 == 1) & (ra!=0);
 	wire isMTSPR = (op == 31) & (xop10 == 467);
 	wire isMFSPR = (op == 31) & (xop10 == 339);
 	wire isMTCRF = (op == 31) & (xop10 == 144);
 	wire isOther = !(isAdd|isOr|isAddi|isB|isBC|isBCLR|isLD|isLDU|
-			isSC|isSTD|isSTDU|isMTSPR|isMFSPR|isMTCRF);
+			isSC|isSTD|isMTSPR|isMFSPR|isMTCRF);
 
 	reg [0:31] instrE;
 	wire [0:5] opE = instrE [0:5];
@@ -291,7 +289,6 @@ module main();
 	wire isLDUE = (opE == 58) & (xop2E == 1) & (raE!=0) & (raE!=rtE);
 	wire isSCE = (opE == 17);
 	wire isSTDE = (opE == 62) & (xop2E == 0);
-	wire isSTDUE = (opE == 62) & (xop2E == 1) & (raE!=0);
 	wire isMTSPRE = (opE == 31) & (xop10E == 467);
 	wire isMFSPRE = (opE == 31) & (xop10E == 339);
 	wire isMTCRFE = (opE == 31) & (xop10E == 144);
@@ -333,19 +330,18 @@ module main();
 	wire isLDUWB = (opWB == 58) & (xop2WB == 1) & (raWB!=0) & (raWB!=rtWB);
 	wire isSCWB = (opWB == 17);
 	wire isSTDWB = (opWB == 62) & (xop2WB == 0);
-	wire isSTDUWB = (opWB == 62) & (xop2WB == 1) & (raWB!=0);
 	wire isMTSPRWB = (opWB == 31) & (xop10WB == 467);
 	wire isMFSPRWB = (opWB == 31) & (xop10WB == 339);
 	wire isMTCRFWB = (opWB == 31) & (xop10WB == 144);
 
 	wire isBranchingWB = (isBWB|((isBCWB|isBCLRWB)&&cond_okWB&&ctr_okWB));
 	wire isOtherWB = !(isAddWB|isOrWB|isAddiWB|isBWB|isBCWB|isBCLRWB|
-				isLDWB|isLDUWB|isSCWB|isSTDWB|isSTDUWB|isMTSPRWB|
+				isLDWB|isLDUWB|isSCWB|isSTDWB|isMTSPRWB|
 					isMFSPRWB|isMTCRFWB);
 	
     	assign regWriteEn0 = (isAddWB|isOrWB|isAddiWB|isLDWB|isLDUWB|isMFSPRWB)&&!nopWB;
-	assign regWriteEn1 = (isLDUWB|isSTDUWB)&&!nopWB;
-	assign memWriteEn = (isSTDWB|isSTDUWB)&&!nopWB;
+	assign regWriteEn1 = (isLDUWB)&&!nopWB;
+	assign memWriteEn = (isSTDWB)&&!nopWB;
     	wire [0:4] targetWriteAddr0WB = isAddWB ? rtWB : 
 					isOrWB ? raWB :
 					isAddiWB ? rtWB : 
@@ -363,26 +359,26 @@ module main();
 					(isMFSPRWB&&sprWB==1) ? xer : 
 					(isMFSPRWB&&sprWB==8) ? lr :
 					(isMFSPRWB&&sprWB==9) ? ctr : 0;
-	wire [0:63] targetVal2 =  isLDUWB|isSTDUWB ? eaWB : 0;
+	wire [0:63] targetVal2 =  isLDUWB ? eaWB : 0;
 
-    	assign regReadEn0 = (isAdd|isOr|isAddi|isLD|isLDU|isSC|isSTD|isSTDU|isMTSPR|isMTCRF);
+    	assign regReadEn0 = (isAdd|isOr|isAddi|isLD|isLDU|isSC|isSTD|isMTSPR|isMTCRF);
     	assign regReadAddr0 = 	isAdd ? ra :
 				isOr ? rs :
 				isAddi ? ra :
 				(isLD|isLDU) ? ra : 
 				isSC ? 0 :
-				(isSTD|isSTDU) ? ra :
+				isSTD ? ra :
 				isMTSPR ? rs :
 				isMTCRF ? rs : 0;
 	
-	assign regReadEn1 = (isAdd|isOr|isSC|isSTD|isSTDU);
+	assign regReadEn1 = (isAdd|isOr|isSC|isSTD);
 	assign regReadAddr1 = 	isAdd ? rb : 
 				isOr ? rb : 
 				isSC ? 3 :
-				(isSTD|isSTDU) ? rs : 0;
+				isSTD ? rs : 0;
 	reg [0:63] run1 = 0;
 //						EXECUTE	
-	wire [0:63] rav = 	(isAddE|isAddiE|isLDE|isLDUE|isSCE|isSTDE|isSTDUE) ? 
+	wire [0:63] rav = 	(isAddE|isAddiE|isLDE|isLDUE|isSCE|isSTDE) ? 
 					(regWriteEn0&&targetWriteAddr0WB==raE&&run1>2) ? targetVal1 :
 					(regWriteEn1&&targetWriteAddr1WB==raE&&run1>2) ? targetVal2 :
 					(Ago1WriteEn0&&Ago1WriteAddr0==raE&&run1>3) ? Ago1WriteData0 :
@@ -394,7 +390,7 @@ module main();
 					(Ago1WriteEn0&&Ago1WriteAddr0==rbE&&(run1>3)) ? Ago1WriteData0 :
 					(Ago1WriteEn1&&(Ago1WriteAddr1==rbE)&&(run1>3)) ? Ago1WriteData1 :
 					regReadData1 : 0;
-	wire [0:63] rsv = 	(isOrE|isSTDE|isSTDUE|isMTSPRE|isMTCRFE) ?
+	wire [0:63] rsv = 	(isOrE|isSTDE|isMTSPRE|isMTCRFE) ?
 					(regWriteEn0&&targetWriteAddr0WB==rsE&&(run1>2)) ? targetVal1 :
 					(regWriteEn1&&targetWriteAddr1WB==rsE&&(run1>2)) ? targetVal2 :
 					(Ago1WriteEn0&&Ago1WriteAddr0==rsE&&(run1>3)) ? Ago1WriteData0 :
