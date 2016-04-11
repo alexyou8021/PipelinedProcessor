@@ -16,12 +16,9 @@ module main();
     clock clock0(halt,clk);
 
 	always @(posedge clk) begin
-		//$display (pc);
-		//$display ("%d:%d",op,nopF);
-		//$display ("%d:%d:%d",regReadEn0, regReadAddr0, regReadData0);
-		//$display ("%d:%d:%d",regReadEn1, regReadAddr1, regReadData1);
-		//$display ("%d:%d", rsv, rbv);
-		//$display ("%h",rsvWB);
+		//$display (pcWB);
+		//$display ("%d:%d",opWB,nopWB);
+		//$display (memWriteAddr);
 		//$display (branchTarget);
 		//$display ("%d : %h", targetWriteAddr0WB, targetVal1);
 		if(isBranchingWB&&!nopWB) begin
